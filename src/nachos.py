@@ -27,6 +27,8 @@ if __name__ == "__main__":
     help="The minimum number of documents verb/verb-pair must appear in. Default is 1.")
   parser.add_argument('-threshold', action='store', dest='threshold', type=int,
     default=1, help="The minimum number of total appearances each verb/verb-pair must have. Default is 1.")
+  parser.add_argument('-pmi-threshold', action='store', dest='pmi_threshold', type=float,
+    default=0., help="The smallest PMI (conditional prob.) each verb/verb-pair must have. Default is 0.")
 
   #set options for how to count bigrams
   parser.add_argument('-sym', action='store_true', dest='symmetric', default=False,\
@@ -42,7 +44,7 @@ if __name__ == "__main__":
     default='all', help="Specifies which coref chains to count over: all, long, or longest.")
 
   #select predictive model
-  parser.add_argument('-model', action='store', dest='model', choices={'ordered_pmi','unordered_pmi','bigram'},\
+  parser.add_argument('-model', action='store', dest='model', choices={'ordered_pmi','unordered_pmi','bigram', 'arm'},\
     default='ordered_pmi', help="Select predictive model for narrative cloze evaluation. If -sym flag selected, \
     then unordered_pmi model must be specified.")
 
@@ -69,6 +71,12 @@ if __name__ == "__main__":
     building top-k table, i.e. how many rows in the v-by-k table. Default of 5,000.")
   parser.add_argument('-k', action='store', dest='k', default=10, type=int, help="The k in \"top-k\" table.\
     Default is 50.")
+
+  # parameters for ARM models
+  parser.add_argument('-arm_vocab', action='store', dest='arm_vocab_path', type=str, default=None,
+    help="Path to ARM vocabulary.")
+  parser.add_argument('-arm_rules', action='store', dest='arm_rules_path', type=str, default=None,
+    help="Path to ARM rules.")
 
   #parse arguments
   args = parser.parse_args(sys.argv[1:])

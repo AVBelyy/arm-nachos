@@ -1,5 +1,4 @@
-from collections import Counter
-from collections import defaultdict
+from collections import Counter, defaultdict, OrderedDict
 import utils
 
 class Model:
@@ -25,6 +24,10 @@ class Model:
     self.discount_factor = args.discount_factor
 
     #do something about log tables
+
+    # read ARM data
+    if args.model == "arm":
+      self.read_arm_data()
 
   #subtract off discount_factor from each value in C greater than 0
   #discount factor should be a value between 0 and 1, non-inclusive
@@ -67,7 +70,7 @@ class Model:
       if self.args.model == "bigram":
         self.apply_abs_discount(self.Cx, self.discount_factor)
         self.apply_abs_discount(self.Cxy, self.discount_factor)
-      elif self.args.model == "ordered_pmi" or self.args.model == "unordered_pmi":
+      elif self.args.model == "ordered_pmi" or self.args.model == "unordered_pmi" or self.args.model == "arm":
         self.compute_discount()
 
 
@@ -115,3 +118,31 @@ class Model:
           N_below_docmin += 1
     #return 1 + V - ((N_below_docmin+1) / 2.0)
     self.bad_rank = 1 + V - ((N_below_docmin+1) / 2.0)
+
+  def read_arm_data(self):
+        if self.args.model == 'arm':
+            self.arm_vocab = {}
+            self.arm_inv_vocab = [None]
+            self.arm_rules = defaultdict(list)
+
+            with open(self.args.arm_vocab_path) as fin:
+                for i, line in enumerate(fin):
+                    token = line.strip()
+                    self.arm_vocab[token] = i + 1
+                    self.arm_inv_vocab.append(token)
+
+            with open(self.args.arm_rules_path) as fin:
+                for line in fin:
+                    tokens = line.strip().split(' ', 1)
+                    rule_weight = float(tokens[0])
+                    lhs, rhs = tokens[1].split('|')
+                    lhs = tuple(int(x) for x in lhs.strip().split())
+                    rhs = int(rhs.strip())
+                    self.arm_rules[rhs].append((lhs, rule_weight))
+
+            # Sort by LHS length (asc order), then by rule weight (desc order)
+            for rhs in self.arm_rules.keys():
+                self.arm_rules[rhs].sort(key=lambda (l, w): (len(l), -w))
+                self.arm_rules[rhs] = OrderedDict(self.arm_rules[rhs])
+
+            self.arm_rules.default_factory = OrderedDict

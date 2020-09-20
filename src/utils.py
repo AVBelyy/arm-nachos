@@ -33,15 +33,18 @@ def print_table(C):
 #given a table of counts, compute a corresponding table of log-counts
 def compute_logtable(C):
   #logC = defaultdict(float)
-  logC = defaultdict(lambda: math.log(.001))
+  logC = defaultdict(lambda: math.log(1e-9))
   for key in C:
-    logC[key] = math.log(C[key]+.001)
+    logC[key] = math.log(C[key]+1e-9)
   return logC
 
 #map an ordered pair to its corresponding unordered pair (set)
 #by lexicographic sorting
 def unordered_pair(x,y):
-  return tuple(sorted([x,y]))
+  if x < y:
+    return (x, y)
+  else:
+    return (y, x)
 
 def pair(x,y,args):
   if args.symmetric:

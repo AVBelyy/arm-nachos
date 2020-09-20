@@ -1,17 +1,30 @@
+import math
+import numpy as np
+
 from model import Model
+from utils import unordered_pair
 
 #e is the event to be scored against the chain, c, at insertion point, m
-def score(M,e,c,m):
+def score(M,e,c,m,is_soln=True):
   logCx = M.logCx
   logCxy = M.logCxy
   Dxy = M.Dxy
   args = M.args
   total_key = M.total_key
+  oov_weight = -math.log(len(M.VOCAB))
+  logCxy_threshold = math.log(args.pmi_threshold + 1e-9) + logCx[e]
   if not args.disc:
     if args.model == 'unordered_pmi':
       assert args.symmetric
-      summands = [logCxy[unordered_pair(e,c_i)] for c_i in c]
-      e_score = sum(summands) - len(c)*logCx[e]
+      summands = []
+      for c_i in c:
+        summand = logCxy[unordered_pair(e,c_i)]
+        if summand < logCxy_threshold:
+            summand = oov_weight
+        else:
+            summand -= logCx[e]
+        summands.append(summand)
+      e_score = sum(summands)
     else:
       #insertion point matters for scoring in ordered versions
       assert args.model == 'ordered_pmi' or args.model == 'bigram'
@@ -34,12 +47,38 @@ def score(M,e,c,m):
       sum_total = 0
       for c_i in c:
         summand1 = logCxy[unordered_pair(e,c_i)]
+        if summand1 < logCxy_threshold:
+            summand1 = oov_weight
+            summand4 = 0.
+        else:
+            summand4 = (-1.0)*logCx[e]
         summand2 = (-1.0)*logCxy[total_key]
         summand3 = (-1.0)*logCx[c_i]
-        summand4 = (-1.0)*logCx[e]
         summand5 = 2*logCx[total_key]
         sum_total += Dxy[unordered_pair(e,c_i)]*(summand1+summand2+summand3+summand4+summand5)
       e_score = sum_total
+    elif args.model == 'arm':
+        candidate_sets = []
+        sum_total = 0.
+        # TODO: make sure vocab is the same for train/test instead.
+        c_ids_set = set(M.arm_vocab[c_i] for c_i in c if c_i in M.arm_vocab)
+        if e in M.arm_vocab:
+            e_id = M.arm_vocab[e]
+            rules = M.arm_rules[e_id]
+            for lhs, weight in rules.items():
+                if c_ids_set.issuperset(lhs):
+                    new_weight = -weight / len(lhs)
+                    candidate_sets.append((set(lhs), new_weight))
+            candidate_sets.sort(key=lambda (l, w): w)
+            for lhs, new_weight in candidate_sets:
+                if c_ids_set.issuperset(lhs):
+                    sum_total += -new_weight * len(lhs)
+                    c_ids_set -= lhs
+                if len(c_ids_set) == 0:
+                    break
+        sum_total += oov_weight * len(c_ids_set)
+        p_prior = logCx[e]
+        e_score = sum_total + p_prior
     else:
       #insertion point matters for scoring in ordered versions
       assert args.model == 'ordered_pmi' or args.model == 'bigram'
@@ -99,7 +138,7 @@ def rank(M,e_soln,c,m):
     #return BAD_RANK
     return M.bad_rank
   #compute score for correct solution
-  e_soln_score = score(M,e_soln,c,m)
+  e_soln_score = score(M,e_soln,c,m,True)
   #compute how many vocab items rank above the correct solution
   #for e in Cx:
   for e in VOCAB:
